@@ -16,9 +16,14 @@ class PunchScheduler {
   /**
    * 啟動所有定時任務
    */
-  start() {
+  async start() {
     console.log('啟動自動打卡定時任務...');
     console.log(`當前時間: ${moment.tz('Asia/Taipei').format('YYYY-MM-DD HH:mm:ss')} (台灣時間)`);
+    
+    // 初始化工作日服務
+    console.log('正在初始化台灣日曆服務...');
+    await this.workdayService.initialize();
+    console.log('✅ 台灣日曆服務初始化完成');
     
     // 上班打卡任務 (每天早上 09:00-09:05 隨機時間)
     this.startPunchInJob();

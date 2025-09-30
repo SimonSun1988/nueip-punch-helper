@@ -68,3 +68,7 @@ logs
 # Temporary files
 tmp/
 temp/
+
+# 台灣日曆資料目錄 - 只保留 .gitkeep，排除其他檔案
+data/*
+!data/.gitkeep

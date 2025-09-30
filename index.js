@@ -31,7 +31,7 @@ class MainApp {
     console.log('=====================================');
     
     // 啟動定時任務
-    this.scheduler.start();
+    await this.scheduler.start();
     
     // 設置優雅關閉處理
     this.setupGracefulShutdown();
