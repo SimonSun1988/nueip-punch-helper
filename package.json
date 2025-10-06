@@ -6,8 +6,6 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "test-chrome": "node testChrome.js",
-    "test-login": "node testLogin.js",
     "test-punch-in": "node index.js test-punch-in",
     "test-punch-out": "node index.js test-punch-out",
     "check-workday": "node index.js check-workday"

@@ -177,21 +177,18 @@ class PunchService {
 
       // 嘗試多種選擇器來找到輸入框
       const companyCodeSelectors = [
-        'input[name="company_code"]',
         'input[placeholder="公司代碼"]',
         'input[placeholder*="公司"]',
         'input[type="text"]:first-of-type'
       ];
 
       const employeeIdSelectors = [
-        'input[name="employee_id"]',
         'input[placeholder="員工編號"]',
         'input[placeholder*="員工"]',
         'input[type="text"]:nth-of-type(2)'
       ];
 
       const passwordSelectors = [
-        'input[name="password"]',
         'input[placeholder="密碼"]',
         'input[type="password"]'
       ];
@@ -226,8 +223,6 @@ class PunchService {
       // 點擊登入按鈕
       console.log('尋找登入按鈕...');
       const loginButtonSelectors = [
-        'button[type="submit"]',
-        'input[type="submit"]',
         'button:contains("登入")',
         'button:contains("登錄")',
         'button:contains("Login")',
@@ -247,7 +242,7 @@ class PunchService {
         // 如果找不到按鈕，嘗試通過文字內容查找
         console.log('嘗試通過文字內容查找登入按鈕...');
         loginButton = await page.evaluateHandle(() => {
-          const elements = Array.from(document.querySelectorAll('button, input[type="submit"], span, div, a, [class*="button"], [class*="btn"]'));
+          const elements = Array.from(document.querySelectorAll('button, span, div, a, [class*="button"], [class*="btn"]'));
           return elements.find(el => {
             const text = el.textContent.toLowerCase().trim();
             return text.includes('登入') || 
@@ -379,6 +374,22 @@ class PunchService {
     }
   }
 
+
+  /**
+   * 通用的按鈕查找方法
+   * @param {Object} page - Puppeteer 頁面物件
+   * @param {Array<string>} keywords - 要查找的關鍵字陣列
+   * @returns {Object|null} 找到的元素或 null
+   */
+  async findButtonByKeywords(page, keywords) {
+    return await page.evaluateHandle((keywords) => {
+      const elements = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"], span, [class*="button"], [class*="btn"]'));
+      return elements.find(el => {
+        const text = el.textContent.toLowerCase().trim();
+        return keywords.some(keyword => text.includes(keyword.toLowerCase()));
+      });
+    }, keywords);
+  }
 
   /**
    * 根據多個選擇器尋找元素（不點擊）
@@ -554,37 +565,12 @@ class PunchService {
       if (!buttonClicked) {
         // 如果找不到按鈕，嘗試通過文字內容查找
         console.log('嘗試通過文字內容查找上班打卡按鈕...');
-        buttonClicked = await page.evaluate(() => {
-          const elements = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"], span'));
-          const foundElement = elements.find(el => {
-            const text = el.textContent.trim();
-            return text === '上班' || 
-                   text.includes('上班') || 
-                   text.includes('打卡') ||
-                   text.includes('punch') ||
-                   el.getAttribute('data-action') === 'punch-in' ||
-                   el.getAttribute('onclick')?.includes('punch');
-          });
-          if (foundElement) {
-            // 嘗試點擊元素本身
-            try {
-              foundElement.click();
-              return true;
-            } catch (e) {
-              // 如果元素本身不能點擊，嘗試點擊父元素
-              let parent = foundElement.parentElement;
-              while (parent && parent !== document.body) {
-                try {
-                  parent.click();
-                  return true;
-                } catch (e2) {
-                  parent = parent.parentElement;
-                }
-              }
-            }
-          }
-          return false;
-        });
+        const punchInButton = await this.findButtonByKeywords(page, ['上班', '打卡', 'punch']);
+        if (punchInButton && await page.evaluate(el => el !== null, punchInButton)) {
+          console.log('✅ 找到上班打卡按鈕');
+          await punchInButton.click();
+          buttonClicked = true;
+        }
       }
 
       if (!buttonClicked) {
@@ -719,37 +705,12 @@ class PunchService {
       if (!buttonClicked) {
         // 如果找不到按鈕，嘗試通過文字內容查找
         console.log('嘗試通過文字內容查找下班打卡按鈕...');
-        buttonClicked = await page.evaluate(() => {
-          const elements = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"], span'));
-          const foundElement = elements.find(el => {
-            const text = el.textContent.trim();
-            return text === '下班' || 
-                   text.includes('下班') || 
-                   text.includes('打卡') ||
-                   text.includes('punch') ||
-                   el.getAttribute('data-action') === 'punch-out' ||
-                   el.getAttribute('onclick')?.includes('punch');
-          });
-          if (foundElement) {
-            // 嘗試點擊元素本身
-            try {
-              foundElement.click();
-              return true;
-            } catch (e) {
-              // 如果元素本身不能點擊，嘗試點擊父元素
-              let parent = foundElement.parentElement;
-              while (parent && parent !== document.body) {
-                try {
-                  parent.click();
-                  return true;
-                } catch (e2) {
-                  parent = parent.parentElement;
-                }
-              }
-            }
-          }
-          return false;
-        });
+        const punchOutButton = await this.findButtonByKeywords(page, ['下班', '打卡', 'punch']);
+        if (punchOutButton && await page.evaluate(el => el !== null, punchOutButton)) {
+          console.log('✅ 找到下班打卡按鈕');
+          await punchOutButton.click();
+          buttonClicked = true;
+        }
       }
 
       if (!buttonClicked) {

@@ -1,6 +1,6 @@
 const { CronJob } = require('cron');
 const moment = require('moment-timezone');
-const TaiwanWorkdayService = require('./calendarService');
+const TaiwanCalendarService = require('./taiwanCalendarService');
 const PunchService = require('./punchService');
 
 /**
@@ -8,7 +8,7 @@ const PunchService = require('./punchService');
  */
 class PunchScheduler {
   constructor() {
-    this.workdayService = new TaiwanWorkdayService();
+    this.workdayService = new TaiwanCalendarService();
     this.punchService = new PunchService();
     this.jobs = [];
   }
