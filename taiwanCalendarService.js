@@ -2,6 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
+const _ = require('lodash');
 
 /**
  * 台灣日曆服務 - 從 TaiwanCalendar API 下載年度放假資料
@@ -92,18 +93,21 @@ class TaiwanCalendarService {
       throw new Error('無效的資料格式');
     }
 
+    // 使用 lodash 過濾和轉換資料
+    const validData = _.filter(data, item => 
+      item.date && typeof item.isHoliday === 'boolean'
+    );
+
     // 將資料轉換為 Map 格式，以日期為 key
     const yearData = new Map();
     
-    data.forEach(item => {
-      if (item.date && typeof item.isHoliday === 'boolean') {
-        yearData.set(item.date, {
-          date: item.date,
-          week: item.week,
-          isHoliday: item.isHoliday,
-          description: item.description || ''
-        });
-      }
+    _.forEach(validData, item => {
+      yearData.set(item.date, {
+        date: item.date,
+        week: item.week,
+        isHoliday: item.isHoliday,
+        description: item.description || ''
+      });
     });
 
     this.calendarData.set(year, yearData);
@@ -185,7 +189,7 @@ class TaiwanCalendarService {
    * @returns {Promise<boolean>} 今天是否為工作日
    */
   async isTodayWorkday() {
-    return await this.isWorkday(moment.tz(this.timezone));
+    return this.isWorkday(moment.tz(this.timezone));
   }
 
   /**
@@ -249,7 +253,7 @@ class TaiwanCalendarService {
    * @returns {Array<number>} 已載入的年份陣列
    */
   getLoadedYears() {
-    return Array.from(this.calendarData.keys()).sort();
+    return _.sortBy(Array.from(this.calendarData.keys()));
   }
 
   /**
@@ -259,17 +263,17 @@ class TaiwanCalendarService {
   async preloadYears(years) {
     console.log(`📥 預載入年度資料: ${years.join(', ')}`);
     
-    for (const year of years) {
-      if (!this.calendarData.has(year)) {
-        try {
-          if (!this.loadYearDataFromFile(year)) {
-            await this.downloadYearData(year);
-          }
-        } catch (error) {
-          console.warn(`⚠️ 預載入 ${year} 年度資料失敗: ${error.message}`);
+    const unloadedYears = _.filter(years, year => !this.calendarData.has(year));
+    
+    await Promise.all(_.map(unloadedYears, async (year) => {
+      try {
+        if (!this.loadYearDataFromFile(year)) {
+          await this.downloadYearData(year);
         }
+      } catch (error) {
+        console.warn(`⚠️ 預載入 ${year} 年度資料失敗: ${error.message}`);
       }
-    }
+    }));
   }
 }
 

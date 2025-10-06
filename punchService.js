@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-core');
 const moment = require('moment-timezone');
+const _ = require('lodash');
 require('dotenv').config();
 
 /**
@@ -78,86 +79,108 @@ class PunchService {
   }
 
   /**
+   * 獲取平台特定的 Chrome 路徑
+   * @returns {Array<string>} 可能的 Chrome 路徑陣列
+   */
+  getChromePaths() {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const platform = os.platform();
+
+    const pathConfigs = {
+      darwin: [
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Chromium.app/Contents/MacOS/Chromium',
+        path.join(os.homedir(), '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+      ],
+      linux: [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/snap/bin/chromium'
+      ],
+      win32: [
+        path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe')
+      ]
+    };
+
+    return pathConfigs[platform] || [];
+  }
+
+  /**
+   * 檢查 Chrome 路徑是否存在
+   * @param {string} chromePath - Chrome 路徑
+   * @returns {boolean} 路徑是否存在
+   */
+  checkChromePath(chromePath) {
+    const fs = require('fs');
+    try {
+      return fs.existsSync(chromePath);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 嘗試從系統 PATH 找到 Chrome
+   * @returns {string|null} Chrome 命令或 null
+   */
+  findChromeInPath() {
+    const { execSync } = require('child_process');
+    const os = require('os');
+    const platform = os.platform();
+
+    const commands = platform === 'win32' 
+      ? ['chrome', 'google-chrome', 'chromium']
+      : ['google-chrome', 'chromium'];
+
+    return _.find(commands, cmd => {
+      try {
+        const checkCmd = platform === 'win32' ? `where ${cmd}` : `which ${cmd}`;
+        execSync(checkCmd, { stdio: 'ignore' });
+        return true;
+      } catch (error) {
+        return false;
+      }
+    });
+  }
+
+  /**
    * 尋找 Chrome 執行檔路徑
    * @returns {string} Chrome 執行檔路徑
    */
   async findChromeExecutable() {
-    const fs = require('fs');
-    const path = require('path');
-    const os = require('os');
-
     // 首先檢查環境變數
     if (process.env.CHROME_PATH) {
       console.log(`使用環境變數指定的 Chrome 路徑: ${process.env.CHROME_PATH}`);
-      if (fs.existsSync(process.env.CHROME_PATH)) {
+      if (this.checkChromePath(process.env.CHROME_PATH)) {
         return process.env.CHROME_PATH;
       } else {
         console.warn(`環境變數指定的 Chrome 路徑不存在: ${process.env.CHROME_PATH}`);
       }
     }
 
-    const platform = os.platform();
-    const possiblePaths = [];
-
-    if (platform === 'darwin') {
-      // macOS
-      possiblePaths.push(
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/Applications/Chromium.app/Contents/MacOS/Chromium',
-        path.join(os.homedir(), '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-      );
-    } else if (platform === 'linux') {
-      // Linux
-      possiblePaths.push(
-        '/usr/bin/google-chrome',
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium',
-        '/snap/bin/chromium'
-      );
-    } else if (platform === 'win32') {
-      // Windows
-      const programFiles = process.env.PROGRAMFILES || 'C:\\Program Files';
-      const programFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
-      
-      possiblePaths.push(
-        path.join(programFiles, 'Google\\Chrome\\Application\\chrome.exe'),
-        path.join(programFilesX86, 'Google\\Chrome\\Application\\chrome.exe'),
-        path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe')
-      );
+    // 檢查平台特定的路徑
+    const possiblePaths = this.getChromePaths();
+    const foundPath = _.find(possiblePaths, path => this.checkChromePath(path));
+    
+    if (foundPath) {
+      console.log(`找到 Chrome 執行檔: ${foundPath}`);
+      return foundPath;
     }
 
-    // 檢查每個可能的路徑
-    for (const chromePath of possiblePaths) {
-      try {
-        if (fs.existsSync(chromePath)) {
-          console.log(`找到 Chrome 執行檔: ${chromePath}`);
-          return chromePath;
-        }
-      } catch (error) {
-        // 繼續檢查下一個路徑
-      }
+    // 嘗試從系統 PATH 找到 Chrome
+    const chromeCommand = this.findChromeInPath();
+    if (chromeCommand) {
+      console.log(`從系統 PATH 找到 Chrome: ${chromeCommand}`);
+      return chromeCommand;
     }
 
-    // 如果找不到，嘗試使用系統 PATH 中的 chrome
-    try {
-      const { execSync } = require('child_process');
-      if (platform === 'win32') {
-        execSync('where chrome', { stdio: 'ignore' });
-        return 'chrome';
-      } else {
-        execSync('which google-chrome', { stdio: 'ignore' });
-        return 'google-chrome';
-      }
-    } catch (error) {
-      // 最後嘗試 chromium
-      try {
-        execSync('which chromium', { stdio: 'ignore' });
-        return 'chromium';
-      } catch (error2) {
-        throw new Error('找不到 Chrome 或 Chromium 瀏覽器。請安裝 Chrome 瀏覽器或設定 CHROME_PATH 環境變數。');
-      }
-    }
+    throw new Error('找不到 Chrome 或 Chromium 瀏覽器。請安裝 Chrome 瀏覽器或設定 CHROME_PATH 環境變數。');
   }
 
   /**
@@ -503,13 +526,17 @@ class PunchService {
   }
 
   /**
-   * 上班打卡
+   * 通用的打卡流程
+   * @param {string} punchType - 打卡類型 ('in' 或 'out')
+   * @param {Array<string>} selectors - 按鈕選擇器陣列
+   * @param {Array<string>} keywords - 關鍵字陣列
    * @returns {boolean} 打卡是否成功
    */
-  async punchIn() {
+  async performPunch(punchType, selectors, keywords) {
     let browser = null;
     try {
-      console.log('開始上班打卡流程...');
+      const punchTypeText = punchType === 'in' ? '上班' : '下班';
+      console.log(`開始${punchTypeText}打卡流程...`);
       
       // 等待隨機時間 (0-60秒)
       await this.waitRandomTime(0, 1);
@@ -542,82 +569,50 @@ class PunchService {
         console.log('⚠️ 位置權限未開啟，但繼續嘗試打卡...');
       }
 
-      // 尋找並點擊上班打卡按鈕
-      console.log('尋找上班打卡按鈕...');
+      // 尋找並點擊打卡按鈕
+      console.log(`尋找${punchTypeText}打卡按鈕...`);
       
-      // 嘗試多種可能的選擇器
-      const punchInSelectors = [
-        'span:contains("上班")',
-        'span[data-v-7560a1d1]:contains("上班")',
-        'button:contains("上班打卡")',
-        'button:contains("上班")',
-        'a:contains("上班打卡")',
-        'a:contains("上班")',
-        '[data-action="punch-in"]',
-        '.punch-in-btn',
-        '#punch-in',
-        'button[onclick*="punch"]',
-        'a[href*="punch"]'
-      ];
-
-      let buttonClicked = await this.findAndClickElement(page, punchInSelectors);
+      let buttonClicked = await this.findAndClickElement(page, selectors);
 
       if (!buttonClicked) {
         // 如果找不到按鈕，嘗試通過文字內容查找
-        console.log('嘗試通過文字內容查找上班打卡按鈕...');
-        const punchInButton = await this.findButtonByKeywords(page, ['上班', '打卡', 'punch']);
-        if (punchInButton && await page.evaluate(el => el !== null, punchInButton)) {
-          console.log('✅ 找到上班打卡按鈕');
-          await punchInButton.click();
+        console.log(`嘗試通過文字內容查找${punchTypeText}打卡按鈕...`);
+        const punchButton = await this.findButtonByKeywords(page, keywords);
+        if (punchButton && await page.evaluate(el => el !== null, punchButton)) {
+          console.log(`✅ 找到${punchTypeText}打卡按鈕`);
+          await punchButton.click();
           buttonClicked = true;
         }
       }
 
       if (!buttonClicked) {
         // 最後嘗試：截圖並顯示頁面內容以便調試
-        console.log('無法找到上班打卡按鈕，正在截圖...');
-        await page.screenshot({ path: 'debug-punch-page.png', fullPage: true });
-        console.log('已截圖保存為 debug-punch-page.png');
+        console.log(`無法找到${punchTypeText}打卡按鈕，正在截圖...`);
+        await page.screenshot({ path: `debug-punch-${punchType}-page.png`, fullPage: true });
+        console.log(`已截圖保存為 debug-punch-${punchType}-page.png`);
         
         // 顯示頁面上所有按鈕的文字內容
-        const allButtons = await page.evaluate(() => {
-          const buttons = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"]'));
-          return buttons.map(btn => ({
-            tag: btn.tagName,
-            text: btn.textContent.trim(),
-            className: btn.className,
-            id: btn.id,
-            onclick: btn.getAttribute('onclick')
-          }));
-        });
+        const allButtons = await this.getAllButtons(page);
         
         console.log('頁面上的所有按鈕:', JSON.stringify(allButtons, null, 2));
-        throw new Error('找不到上班打卡按鈕');
+        throw new Error(`找不到${punchTypeText}打卡按鈕`);
       }
 
-      console.log('✅ 上班打卡按鈕已點擊');
+      console.log(`✅ ${punchTypeText}打卡按鈕已點擊`);
 
       // 等待打卡完成
       await page.waitForTimeout(3000);
 
       // 檢查打卡結果
-      const successMessage = await page.evaluate(() => {
-        const messages = document.querySelectorAll('.alert, .message, .notification, .success');
-        for (const msg of messages) {
-          if (msg.textContent.includes('成功') || msg.textContent.includes('完成')) {
-            return msg.textContent;
-          }
-        }
-        return null;
-      });
+      const successMessage = await this.checkPunchResult(page);
 
       if (successMessage) {
-        console.log('上班打卡成功:', successMessage);
+        console.log(`${punchTypeText}打卡成功:`, successMessage);
       } else {
-        console.log('上班打卡完成 (未找到明確的成功訊息)');
+        console.log(`${punchTypeText}打卡完成 (未找到明確的成功訊息)`);
       }
 
-      console.log('✅ 上班打卡流程完成');
+      console.log(`✅ ${punchTypeText}打卡流程完成`);
       console.log('='.repeat(50));
       
       if (browser) {
@@ -628,9 +623,9 @@ class PunchService {
       return true;
 
     } catch (error) {
-      console.error('上班打卡失敗:', error.message);
+      console.error(`${punchType === 'in' ? '上班' : '下班'}打卡失敗:`, error.message);
       
-      console.log('❌ 上班打卡失敗');
+      console.log(`❌ ${punchType === 'in' ? '上班' : '下班'}打卡失敗`);
       console.log('='.repeat(50));
       
       if (browser) {
@@ -643,143 +638,86 @@ class PunchService {
   }
 
   /**
+   * 獲取頁面上所有按鈕資訊
+   * @param {Object} page - Puppeteer 頁面物件
+   * @returns {Array} 按鈕資訊陣列
+   */
+  async getAllButtons(page) {
+    return await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"]'));
+      return buttons.map(btn => ({
+        tag: btn.tagName,
+        text: btn.textContent.trim(),
+        className: btn.className,
+        id: btn.id,
+        onclick: btn.getAttribute('onclick')
+      }));
+    });
+  }
+
+  /**
+   * 檢查打卡結果
+   * @param {Object} page - Puppeteer 頁面物件
+   * @returns {string|null} 成功訊息或 null
+   */
+  async checkPunchResult(page) {
+    return await page.evaluate(() => {
+      const messages = document.querySelectorAll('.alert, .message, .notification, .success');
+      for (const msg of messages) {
+        if (msg.textContent.includes('成功') || msg.textContent.includes('完成')) {
+          return msg.textContent;
+        }
+      }
+      return null;
+    });
+  }
+
+  /**
+   * 上班打卡
+   * @returns {boolean} 打卡是否成功
+   */
+  async punchIn() {
+    const punchInSelectors = [
+      'span:contains("上班")',
+      'span[data-v-7560a1d1]:contains("上班")',
+      'button:contains("上班打卡")',
+      'button:contains("上班")',
+      'a:contains("上班打卡")',
+      'a:contains("上班")',
+      '[data-action="punch-in"]',
+      '.punch-in-btn',
+      '#punch-in',
+      'button[onclick*="punch"]',
+      'a[href*="punch"]'
+    ];
+
+    const keywords = ['上班', '打卡', 'punch'];
+    
+    return await this.performPunch('in', punchInSelectors, keywords);
+  }
+
+  /**
    * 下班打卡
    * @returns {boolean} 打卡是否成功
    */
   async punchOut() {
-    let browser = null;
-    try {
-      console.log('開始下班打卡流程...');
-      
-      // 等待隨機時間 (0-60秒)
-      await this.waitRandomTime(0, 1);
-      
-      browser = await this.launchBrowser();
-      const page = await browser.newPage();
+    const punchOutSelectors = [
+      'span:contains("下班")',
+      'span[data-v-7560a1d1]:contains("下班")',
+      'button:contains("下班打卡")',
+      'button:contains("下班")',
+      'a:contains("下班打卡")',
+      'a:contains("下班")',
+      '[data-action="punch-out"]',
+      '.punch-out-btn',
+      '#punch-out',
+      'button[onclick*="punch"]',
+      'a[href*="punch"]'
+    ];
 
-      // 設置位置權限
-      const permissionSet = await this.setupLocationPermission(browser);
-      if (!permissionSet) {
-        throw new Error('設置位置權限失敗');
-      }
-
-      // 登入系統
-      const loginSuccess = await this.login(page);
-      if (!loginSuccess) {
-        throw new Error('登入失敗');
-      }
-
-      // 前往首頁
-      await page.goto(this.homeUrl, { waitUntil: 'networkidle2' });
-      await page.waitForTimeout(2000);
-
-      // 設置地理位置
-      await this.setLocation(page);
-
-      // 確認位置權限是否已開啟
-      const permissionEnabled = await this.checkLocationPermission(page);
-      if (!permissionEnabled) {
-        console.log('⚠️ 位置權限未開啟，但繼續嘗試打卡...');
-      }
-
-      // 尋找並點擊下班打卡按鈕
-      console.log('尋找下班打卡按鈕...');
-      
-      // 嘗試多種可能的選擇器
-      const punchOutSelectors = [
-        'span:contains("下班")',
-        'span[data-v-7560a1d1]:contains("下班")',
-        'button:contains("下班打卡")',
-        'button:contains("下班")',
-        'a:contains("下班打卡")',
-        'a:contains("下班")',
-        '[data-action="punch-out"]',
-        '.punch-out-btn',
-        '#punch-out',
-        'button[onclick*="punch"]',
-        'a[href*="punch"]'
-      ];
-
-      let buttonClicked = await this.findAndClickElement(page, punchOutSelectors);
-
-      if (!buttonClicked) {
-        // 如果找不到按鈕，嘗試通過文字內容查找
-        console.log('嘗試通過文字內容查找下班打卡按鈕...');
-        const punchOutButton = await this.findButtonByKeywords(page, ['下班', '打卡', 'punch']);
-        if (punchOutButton && await page.evaluate(el => el !== null, punchOutButton)) {
-          console.log('✅ 找到下班打卡按鈕');
-          await punchOutButton.click();
-          buttonClicked = true;
-        }
-      }
-
-      if (!buttonClicked) {
-        // 最後嘗試：截圖並顯示頁面內容以便調試
-        console.log('無法找到下班打卡按鈕，正在截圖...');
-        await page.screenshot({ path: 'debug-punch-out-page.png', fullPage: true });
-        console.log('已截圖保存為 debug-punch-out-page.png');
-        
-        // 顯示頁面上所有按鈕的文字內容
-        const allButtons = await page.evaluate(() => {
-          const buttons = Array.from(document.querySelectorAll('button, a, input[type="button"], div[role="button"]'));
-          return buttons.map(btn => ({
-            tag: btn.tagName,
-            text: btn.textContent.trim(),
-            className: btn.className,
-            id: btn.id,
-            onclick: btn.getAttribute('onclick')
-          }));
-        });
-        
-        console.log('頁面上的所有按鈕:', JSON.stringify(allButtons, null, 2));
-        throw new Error('找不到下班打卡按鈕');
-      }
-
-      console.log('✅ 下班打卡按鈕已點擊');
-
-      // 等待打卡完成
-      await page.waitForTimeout(3000);
-
-      // 檢查打卡結果
-      const successMessage = await page.evaluate(() => {
-        const messages = document.querySelectorAll('.alert, .message, .notification, .success');
-        for (const msg of messages) {
-          if (msg.textContent.includes('成功') || msg.textContent.includes('完成')) {
-            return msg.textContent;
-          }
-        }
-        return null;
-      });
-
-      if (successMessage) {
-        console.log('下班打卡成功:', successMessage);
-      } else {
-        console.log('下班打卡完成 (未找到明確的成功訊息)');
-      }
-
-      console.log('✅ 下班打卡流程完成');
-      console.log('='.repeat(50));
-      
-      if (browser) {
-        console.log('關閉瀏覽器...');
-        await browser.close();
-      }
-
-      return true;
-
-    } catch (error) {
-      console.error('下班打卡失敗:', error.message);
-      
-      console.log('❌ 下班打卡失敗');
-      console.log('='.repeat(50));
-      
-      if (browser) {
-        console.log('關閉瀏覽器...');
-        await browser.close();
-      }
-      
-      return false;
-    }
+    const keywords = ['下班', '打卡', 'punch'];
+    
+    return await this.performPunch('out', punchOutSelectors, keywords);
   }
 }
 

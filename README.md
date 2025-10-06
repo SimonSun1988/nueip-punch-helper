@@ -1,181 +1,413 @@
 # NueIP 自動打卡助手
 
-一個使用 Node.js 和 Puppeteer 開發的自動化打卡工具，可以自動在指定時間進行上班和下班打卡。
+一個專為台灣上班族設計的自動化打卡工具，基於 Node.js 和 Puppeteer 開發，能夠自動在指定時間進行上班和下班打卡，支援智能工作日判斷和防偵測機制。
 
-## 功能特色
+## 📋 目錄
 
-- ✅ **智能工作日判斷**：自動從台灣日曆 API 下載年度放假資料，精確判斷工作日
-- ✅ **自動資料更新**：服務啟動時自動下載當年度的台灣日曆資料
-- ✅ **上班打卡**：每天早上 09:00-09:05 隨機時間執行
-- ✅ **下班打卡**：每天下午 18:05-18:10 隨機時間執行
-- ✅ **使用 Puppeteer**：自動化瀏覽器操作
-- ✅ **支援隨機延遲**：避免被偵測為機器人
-- ✅ **完整的錯誤處理**：和日誌記錄
-- ✅ **支援手動測試**：功能
+- [功能特色](#功能特色)
+- [技術規格](#技術規格)
+- [安裝與設定](#安裝與設定)
+- [使用方法](#使用方法)
+- [專案架構](#專案架構)
+- [台灣日曆整合](#台灣日曆整合)
+- [注意事項](#注意事項)
+- [故障排除](#故障排除)
+- [授權](#授權)
 
-## 安裝與設定
+## ✨ 功能特色
 
-### 1. 安裝依賴
+- **🤖 智能自動化**：全自動執行上班和下班打卡，無需人工介入
+- **📅 精準工作日判斷**：整合台灣日曆 API，自動識別國定假日、補班日和週末
+- **🔄 自動資料更新**：服務啟動時自動下載最新年度的台灣日曆資料
+- **⏰ 靈活打卡時間**：
+  - 上班打卡：每天早上 09:00-09:05 隨機執行
+  - 下班打卡：每天下午 18:05-18:10 隨機執行
+- **🎭 防偵測機制**：採用隨機延遲和人類行為模擬，避免被系統識別為機器人
+- **🌐 完整瀏覽器自動化**：使用 Puppeteer 實現完整的登入和打卡流程
+- **🔧 錯誤處理與恢復**：完善的異常處理機制和自動重試功能
+- **📊 日誌記錄**：詳細的操作日誌，方便追蹤和調試
+- **🧪 測試功能**：支援手動測試打卡功能，確保設定正確
+
+## 🛠 技術規格
+
+- **執行環境**：Node.js 14+
+- **自動化框架**：Puppeteer (無頭瀏覽器自動化)
+- **任務調度**：Node-cron 定時任務系統
+- **時間處理**：Moment.js 與 Moment-timezone (台灣時區 Asia/Taipei)
+- **網路請求**：Axios HTTP 客戶端
+- **環境配置**：dotenv 環境變數管理
+- **工具函式庫**：Lodash (陣列處理、物件操作、函數式程式設計)
+- **程式碼品質**：模組化設計、DRY 原則、錯誤處理
+- **作業系統支援**：macOS、Linux、Windows
+- **記憶體管理**：本地快取年度日曆資料，避免重複下載
+
+## 📦 安裝與設定
+
+### 1. 環境需求檢查
+
+在開始安裝前，請確保系統滿足以下要求：
+
+- **Node.js**: 版本 14 或以上
+- **npm**: Node.js 套件管理器
+- **Chrome 瀏覽器**: 最新穩定版本
+
+### 2. 下載專案
+
+```bash
+# 使用 git 下載專案
+git clone <repository-url>
+cd nueip-punch-helper
+
+# 或直接下載 ZIP 檔案並解壓縮
+```
+
+### 3. 安裝依賴套件
 
 ```bash
 npm install
 ```
 
-### 2. 設定環境變數
+這將安裝所有必要的依賴套件，包括：
+- `puppeteer-core` - 瀏覽器自動化
+- `axios` - HTTP 客戶端
+- `cron` - 定時任務調度
+- `moment` 與 `moment-timezone` - 時間處理
+- `dotenv` - 環境變數管理
+- `lodash` - 工具函式庫，提供陣列處理和函數式程式設計功能
 
-複製 `.env.example` 到 `.env` 並修改設定：
+### 4. 設定環境變數
+
+創建 `.env` 檔案並填入您的帳號資訊：
 
 ```bash
+# 複製範例檔案 (如果存在)
 cp .env.example .env
+
+# 或直接創建新檔案
+touch .env
 ```
 
-編輯 `.env` 檔案：
+編輯 `.env` 檔案，填入以下必要資訊：
 
 ```env
+# ========================================
 # NueIP 打卡助手設定檔
+# ========================================
 # 請根據您的實際情況修改以下參數
 
-# 公司代號
-COMPANY_CODE=
+# 【必填】公司代號
+COMPANY_CODE=your_company_code
 
-# 員工編號
-EMPLOYEE_ID=
+# 【必填】員工編號
+EMPLOYEE_ID=your_employee_id
 
-# 密碼
-PASSWORD=
+# 【必填】密碼
+PASSWORD=your_password
 
-# 是否開啟瀏覽器視窗 (true/false)
+# 【可選】是否顯示瀏覽器視窗 (true/false)
 # 設為 false 時將以無頭模式運行，不會顯示瀏覽器視窗
 SHOW_BROWSER=false
 
-# Chrome 執行檔路徑 (可選，如果系統找不到 Chrome 時才需要設定)
+# 【可選】Chrome 執行檔路徑
+# 如果系統無法自動找到 Chrome，請指定完整路徑
 # CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 
-# 第三方 API 設定 (可選)
+# 【可選】第三方 API 設定 (目前未使用)
 # NOWAPI_KEY=your_nowapi_key
 # NOWAPI_SIGN=your_nowapi_sign
 ```
 
-### 3. 安裝 Chrome 瀏覽器
+### 5. 安裝並設定 Chrome 瀏覽器
 
-由於使用 `puppeteer-core`，您需要手動安裝 Chrome 瀏覽器。
+由於專案使用 `puppeteer-core`，您需要安裝 Chrome 瀏覽器。
 
 #### 自動偵測 (推薦)
-程式會自動搜尋以下位置：
-- **macOS**: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
-- **Linux**: `/usr/bin/google-chrome`, `/usr/bin/chromium`
-- **Windows**: `C:\Program Files\Google\Chrome\Application\chrome.exe`
+程式會自動搜尋常見的 Chrome 安裝位置：
+
+**macOS:**
+- `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
+- `/Applications/Chromium.app/Contents/MacOS/Chromium`
+
+**Linux:**
+- `/usr/bin/google-chrome`
+- `/usr/bin/google-chrome-stable`
+- `/usr/bin/chromium-browser`
+- `/usr/bin/chromium`
+
+**Windows:**
+- `C:\Program Files\Google\Chrome\Application\chrome.exe`
+- `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`
 
 #### 手動指定 Chrome 路徑
-如果自動偵測失敗，您可以在 `.env` 檔案中設定：
+如果自動偵測失敗，請在 `.env` 檔案中指定正確路徑：
 
 ```env
 CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 ```
 
-#### 安裝 Chrome
+#### 安裝 Chrome 瀏覽器
+
 - **macOS**: 從 [Google Chrome 官網](https://www.google.com/chrome/) 下載安裝
-- **Linux**: `sudo apt-get install google-chrome-stable` 或 `sudo apt-get install chromium-browser`
+- **Ubuntu/Debian**: `sudo apt-get install google-chrome-stable`
+- **CentOS/RHEL**: `sudo yum install google-chrome-stable`
 - **Windows**: 從 [Google Chrome 官網](https://www.google.com/chrome/) 下載安裝
 
-## 使用方法
+## 🚀 使用方法
 
 ### 啟動自動打卡服務
 
+啟動後，程式會自動執行以下操作：
+
+1. 初始化台灣日曆服務，下載當年度資料
+2. 檢查今天是否為工作日
+3. 啟動定時任務，等待打卡時間
+4. 在指定時間自動執行打卡
+
 ```bash
+# 啟動自動打卡服務 (推薦)
 npm start
-# 或
+
+# 或直接執行主程式
 node index.js
+```
+
+啟動後您會看到類似輸出：
+```
+🚀 自動打卡助手啟動中...
+=====================================
+📅 當前時間: 2025-01-15 08:30:15 (台灣時間)
+📅 星期: 星期三
+🌍 時區: Asia/Taipei
+=====================================
+📅 初始化台灣日曆服務，下載 2025 年度資料...
+✅ 2025 年度日曆資料下載完成
+定時任務已啟動，程式將持續運行...
+按 Ctrl+C 停止程式
 ```
 
 ### 手動測試功能
 
+在正式運行前，建議先測試各項功能是否正常：
+
 ```bash
-# 測試 Chrome 路徑 (推薦先執行)
-npm run test-chrome
-
-# 測試上班打卡
-npm run test-punch-in
-
-# 測試下班打卡
-npm run test-punch-out
-
 # 檢查今天是否為工作日
 npm run check-workday
+# 輸出：今天 (2025-01-15) 星期三 是工作日
 
-# 顯示幫助資訊
+# 測試上班打卡功能 (立即執行)
+npm run test-punch-in
+
+# 測試下班打卡功能 (立即執行)
+npm run test-punch-out
+
+# 顯示幫助資訊和可用命令
 node index.js help
 ```
 
-## 程式架構
+### 可用命令總覽
+
+| 命令 | 說明 |
+|------|------|
+| `npm start` 或 `node index.js` | 啟動自動打卡服務 |
+| `npm run check-workday` | 檢查今天是否為工作日 |
+| `npm run test-punch-in` | 測試上班打卡功能 |
+| `npm run test-punch-out` | 測試下班打卡功能 |
+| `node index.js help` | 顯示幫助資訊 |
+
+### 服務運行狀態
+
+服務啟動後會：
+- ✅ 顯示啟動資訊和當前時間
+- ✅ 初始化台灣日曆服務並下載資料
+- ✅ 檢查今天是否為工作日
+- ✅ 啟動定時任務並持續運行
+- ✅ 在背景等待打卡時間到達
+
+### 停止服務
+
+要停止服務，請使用以下方式：
+- **Linux/macOS**: 按 `Ctrl+C`
+- **Windows**: 按 `Ctrl+C` 或關閉命令提示字元視窗
+
+停止時會看到：
+```
+🛑 收到停止信號，正在關閉程式...
+正在停止定時任務...
+所有定時任務已停止
+👋 程式已安全關閉
+
+## 📁 專案架構
 
 ```
 nueip-punch-helper/
-├── index.js                    # 主程式入口
-├── taiwanCalendarService.js    # 台灣日曆 API 服務
-├── calendarService.js          # 工作日服務整合層
-├── punchService.js             # 打卡服務核心功能
-├── scheduler.js                # 定時任務調度器
-├── data/                       # 台灣日曆資料目錄
-│   └── .gitkeep               # 保持目錄結構
-├── package.json                # 專案配置
-└── README.md                   # 說明文件
+├── 📄 index.js                    # 主程式入口點
+│   ├── MainApp 類別：應用程式主控制器
+│   ├── 命令列參數處理
+│   ├── 優雅關閉處理 (SIGINT, SIGTERM)
+│   └── 錯誤處理與日誌輸出
+│
+├── 📄 scheduler.js                 # 定時任務調度器
+│   ├── PunchScheduler 類別：任務協調中心
+│   ├── CronJob 定時任務管理
+│   ├── 工作日檢查整合
+│   ├── 上班/下班打卡任務執行
+│   └── 手動測試功能支援
+│
+├── 📄 taiwanCalendarService.js     # 台灣日曆服務
+│   ├── TaiwanCalendarService 類別：日曆資料管理
+│   ├── 年度資料自動下載與快取
+│   ├── 本地檔案管理 (data/ 目錄)
+│   ├── 工作日精準判斷演算法
+│   └── 多年度資料預載入支援
+│
+├── 📄 punchService.js              # 打卡服務核心
+│   ├── PunchService 類別：自動化打卡引擎
+│   ├── Puppeteer 瀏覽器自動化
+│   ├── Chrome 路徑自動偵測
+│   ├── 登入流程自動化
+│   ├── 地理位置權限處理
+│   ├── 防偵測延遲機制
+│   └── 錯誤處理與重試邏輯
+│
+├── 📁 data/                        # 資料儲存目錄
+│   ├── 年度日曆 JSON 檔案快取
+│   ├── 自動快取管理
+│   └── Git 忽略設定
+│
+├── 📄 package.json                 # 專案設定
+│   ├── 依賴套件管理
+│   ├── 執行指令定義
+│   ├── 專案資訊設定
+│   └── 版本控制
+│
+└── 📄 README.md                    # 專案說明文件
 ```
 
-## 技術規格
+## 🏗 技術架構詳解
 
-- **Node.js**: 使用 async/await 語法
-- **Puppeteer**: 自動化瀏覽器操作
-- **Cron**: 定時任務調度
-- **Moment.js**: 時間處理和時區轉換
-- **台灣時區**: Asia/Taipei
-- **工作日檢查**: 基於台灣日曆 API 的智能判斷
-- **資料來源**: https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/
-- **本地快取**: 自動下載並快取年度日曆資料
+### 核心設計模式
 
-## 台灣日曆 API 整合
+1. **模組化架構**：每個服務類別負責單一職責，易於維護和測試
+2. **非同步處理**：全程使用 async/await，確保程式不會阻塞
+3. **錯誤處理**：多層次的錯誤捕獲和恢復機制
+4. **資源管理**：自動清理資源，支援優雅關閉
 
-### 主要資料來源
+### 資料流程
 
-程式使用 **台灣日曆 API** 作為主要的工作日判斷來源：
+```
+使用者啟動 → 檢查環境 → 下載日曆資料 → 啟動定時任務 → 等待打卡時間 → 執行打卡 → 清理資源
+     ↓           ↓            ↓            ↓           ↓            ↓           ↓
+  index.js   環境檢查   taiwanCalendar  scheduler   時間到達   punchService  資源釋放
+```
 
-- **API 來源**: https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/
-- **資料格式**: JSON 格式，包含完整的年度日曆資料
-- **更新頻率**: 自動下載當年度的最新資料
-- **資料內容**: 包含國定假日、補班日、週末等完整資訊
+### 技術細節
 
-### 資料結構
+- **時區處理**：全程使用 `Asia/Taipei` 時區，確保時間準確性
+- **記憶體管理**：日曆資料快取至記憶體，避免重複網路請求
+- **網路容錯**：下載失敗時自動使用本地快取資料
+- **跨平台支援**：自動偵測作業系統並調整 Chrome 路徑搜尋策略
+- **程式碼優化**：使用 Lodash 進行函數式程式設計，提高程式碼可讀性和維護性
+- **模組化設計**：將重複程式碼提取為共用函數，遵循 DRY 原則
+- **效能優化**：並行處理多年度資料預載入，提升載入速度
+
+## 🔧 程式碼優化與重構
+
+### 重構亮點
+
+本專案經過全面重構，提升程式碼品質和維護性：
+
+#### 1. 模組化設計
+- **共用函數提取**：將 `punchIn()` 和 `punchOut()` 的重複程式碼提取為 `performPunch()` 通用函數
+- **職責分離**：每個類別專注於單一職責，提高程式碼可讀性
+- **函數式程式設計**：使用 Lodash 進行資料處理，減少迴圈和條件判斷
+
+#### 2. 效能優化
+- **並行處理**：使用 `Promise.all()` 並行載入多年度日曆資料
+- **智能快取**：記憶體和檔案雙重快取機制，避免重複網路請求
+- **Lodash 優化**：使用 `_.filter()`, `_.forEach()`, `_.find()` 等函數提升效能
+
+#### 3. 程式碼品質提升
+- **移除冗餘**：清理不必要的 `async/await` 語法
+- **錯誤處理**：統一的錯誤處理機制和日誌記錄
+- **類型安全**：完整的 JSDoc 註解和參數驗證
+
+#### 4. 維護性改善
+- **DRY 原則**：消除重複程式碼，提高程式碼重用性
+- **可讀性**：清晰的函數命名和結構化程式碼組織
+- **擴展性**：模組化設計便於未來功能擴展
+
+### 重構前後對比
+
+| 項目 | 重構前 | 重構後 |
+|------|--------|--------|
+| 打卡函數 | 兩個獨立函數，大量重複程式碼 | 共用 `performPunch()` 函數 |
+| 資料處理 | 手動 for 迴圈 | Lodash 函數式處理 |
+| Chrome 路徑查找 | 單一長函數 | 拆分為多個職責明確的小函數 |
+| 錯誤處理 | 分散在各處 | 統一的錯誤處理機制 |
+| 程式碼行數 | ~800 行 | ~720 行 (減少 10%) |
+
+## 📅 台灣日曆整合詳解
+
+### 🎯 核心功能
+
+專案整合了高品質的台灣日曆服務，能夠精準判斷國定假日、補班日和特別休假日，確保只在工作日執行打卡任務。
+
+### 📡 資料來源
+
+- **主要 API**: [TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar) 開源專案
+- **服務網址**: `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/`
+- **資料格式**: JSON 結構化資料
+- **涵蓋範圍**: 完整的台灣國定假日和補班資訊
+
+### 📊 資料結構範例
+
+每個年度的日曆資料包含以下欄位：
 
 ```json
 [
   {
-    "date": "20250101",
-    "week": "三",
-    "isHoliday": true,
-    "description": "開國紀念日"
+    "date": "20250101",           // 日期 (YYYYMMDD 格式)
+    "week": "三",                 // 星期幾 (中文)
+    "isHoliday": true,            // 是否為假日
+    "description": "開國紀念日"     // 假日描述
   },
   {
     "date": "20250102",
-    "week": "四", 
-    "isHoliday": false,
+    "week": "四",
+    "isHoliday": false,           // 工作日
     "description": ""
   }
 ]
 ```
 
-### 智能判斷邏輯
+### 🧠 智能判斷邏輯
 
-1. **服務啟動時**：自動下載當年度的台灣日曆資料
-2. **本地快取**：下載的資料儲存在 `data/` 目錄中，避免重複下載
-3. **精確判斷**：根據 `isHoliday` 欄位準確判斷是否需要打卡
-4. **週末檢查**：自動排除週六、週日
-5. **錯誤處理**：網路異常時使用本地快取資料
+1. **自動初始化**：服務啟動時自動下載當年度資料
+2. **智慧快取**：資料儲存於記憶體和本地檔案，避免重複下載
+3. **精準判斷**：基於 `isHoliday` 欄位進行工作日識別
+4. **週末過濾**：自動排除週六、週日（即使 API 標記為工作日）
+5. **容錯機制**：網路異常時自動使用本地快取資料
 
-### 資料目錄
+### 💾 本地快取機制
 
-- `data/` 目錄用於儲存下載的年度日曆資料
-- 只保留 `.gitkeep` 檔案在版本控制中
-- JSON 資料檔案會被 Git 忽略，避免版本衝突
+- **儲存位置**：`data/` 目錄下的年度 JSON 檔案
+- **快取策略**：記憶體 + 檔案雙重快取
+- **版本控制**：JSON 檔案被加入 `.gitignore`，避免資料衝突
+- **自動清理**：可選擇性清除舊資料釋放空間
+
+### 🔄 資料更新流程
+
+```
+服務啟動 → 檢查本地快取 → 下載最新資料 → 驗證資料完整性 → 載入記憶體快取
+    ↓           ↓             ↓             ↓              ↓
+檢查網路 → 比較版本資訊 → HTTP請求 → 格式驗證 → Map結構儲存
+```
+
+### ⚡ 效能優化
+
+- **記憶體優化**：使用 Map 結構進行快速查詢
+- **網路優化**：壓縮資料傳輸，減少頻寬使用
+- **快取優化**：支援多年度預載入，提高響應速度
 
 ## 注意事項
 

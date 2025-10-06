@@ -158,7 +158,7 @@ class PunchScheduler {
    */
   async manualPunchIn() {
     console.log('手動執行上班打卡...');
-    await this.executePunchIn();
+    return this.executePunchIn();
   }
 
   /**
@@ -166,7 +166,7 @@ class PunchScheduler {
    */
   async manualPunchOut() {
     console.log('手動執行下班打卡...');
-    await this.executePunchOut();
+    return this.executePunchOut();
   }
 
   /**
