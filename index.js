@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// 首先載入環境變數
+const EnvLoader = require('./envLoader');
+new EnvLoader();
+
 const PunchScheduler = require('./scheduler');
 const moment = require('moment-timezone');
 
@@ -82,21 +86,6 @@ class MainApp {
     });
   }
 
-  /**
-   * 手動測試上班打卡
-   */
-  async testPunchIn() {
-    console.log('🧪 測試上班打卡功能...');
-    await this.scheduler.manualPunchIn();
-  }
-
-  /**
-   * 手動測試下班打卡
-   */
-  async testPunchOut() {
-    console.log('🧪 測試下班打卡功能...');
-    await this.scheduler.manualPunchOut();
-  }
 
   /**
    * 檢查工作日狀態
@@ -117,20 +106,12 @@ async function main() {
     const command = args[0];
     
     switch (command) {
-      case 'test-punch-in':
-        await app.testPunchIn();
-        break;
-      case 'test-punch-out':
-        await app.testPunchOut();
-        break;
       case 'check-workday':
         await app.checkWorkday();
         break;
       case 'help':
         console.log('可用命令:');
         console.log('  node index.js                    - 啟動自動打卡服務');
-        console.log('  node index.js test-punch-in      - 測試上班打卡');
-        console.log('  node index.js test-punch-out     - 測試下班打卡');
         console.log('  node index.js check-workday      - 檢查今天是否為工作日');
         console.log('  node index.js help               - 顯示幫助資訊');
         break;

@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer-core');
 const moment = require('moment-timezone');
 const _ = require('lodash');
-require('dotenv').config();
 
 /**
  * 打卡服務類別

@@ -153,21 +153,6 @@ class PunchScheduler {
     console.log('所有定時任務已停止');
   }
 
-  /**
-   * 手動執行上班打卡 (用於測試)
-   */
-  async manualPunchIn() {
-    console.log('手動執行上班打卡...');
-    return this.executePunchIn();
-  }
-
-  /**
-   * 手動執行下班打卡 (用於測試)
-   */
-  async manualPunchOut() {
-    console.log('手動執行下班打卡...');
-    return this.executePunchOut();
-  }
 
   /**
    * 檢查今天是否為工作日
