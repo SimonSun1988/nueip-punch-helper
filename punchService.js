@@ -190,12 +190,17 @@ class PunchService {
   async login(page) {
     try {
       console.log('正在登入系統...');
-      
+
       // 前往登入頁面
-      await page.goto(this.loginUrl, { waitUntil: 'networkidle2' });
-      
+      await page.goto(this.loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      console.log(`目前頁面 URL: ${page.url()}`);
+
       // 等待頁面載入完成
-      await page.waitForTimeout(3000);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // 記錄頁面資訊以便除錯
+      const pageTitle = await page.title();
+      console.log(`頁面標題: ${pageTitle}`);
 
       // 嘗試多種選擇器來找到輸入框
       const companyCodeSelectors = [
@@ -308,7 +313,14 @@ class PunchService {
       console.log('登入成功');
       return true;
     } catch (error) {
-      console.error('登入失敗:', error.message);
+      console.log('登入失敗:', error.message);
+      // 截圖以便除錯
+      try {
+        await page.screenshot({ path: 'debug-login-failure.png', fullPage: true });
+        console.log('已截圖保存為 debug-login-failure.png');
+      } catch (screenshotError) {
+        console.log('截圖失敗:', screenshotError.message);
+      }
       return false;
     }
   }
@@ -557,7 +569,7 @@ class PunchService {
 
       // 前往首頁
       await page.goto(this.homeUrl, { waitUntil: 'networkidle2' });
-      await page.waitForTimeout(2000);
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // 設置地理位置
       await this.setLocation(page);
@@ -600,7 +612,7 @@ class PunchService {
       console.log(`✅ ${punchTypeText}打卡按鈕已點擊`);
 
       // 等待打卡完成
-      await page.waitForTimeout(3000);
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       // 檢查打卡結果
       const successMessage = await this.checkPunchResult(page);
@@ -622,7 +634,7 @@ class PunchService {
       return true;
 
     } catch (error) {
-      console.error(`${punchType === 'in' ? '上班' : '下班'}打卡失敗:`, error.message);
+      console.log(`${punchType === 'in' ? '上班' : '下班'}打卡失敗:`, error.message);
       
       console.log(`❌ ${punchType === 'in' ? '上班' : '下班'}打卡失敗`);
       console.log('='.repeat(50));
