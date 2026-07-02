@@ -23,6 +23,6 @@
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.43",
-    "puppeteer-core": "^21.5.2"
+    "puppeteer-core": "^25.3.0"
   }
 }

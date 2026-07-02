@@ -11,7 +11,8 @@ class PunchService {
     this.companyCode = process.env.COMPANY_CODE;
     this.employeeId = process.env.EMPLOYEE_ID;
     this.password = process.env.PASSWORD;
-    this.showBrowser = process.env.SHOW_BROWSER;
+    // 環境變數是字串，"false" 也是 truthy，必須明確比對
+    this.showBrowser = process.env.SHOW_BROWSER === 'true';
     this.chromePath = process.env.CHROME_PATH;
     this.loginUrl = 'https://portal.nueip.com/login';
     this.homeUrl = 'https://portal.nueip.com/home';
@@ -58,18 +59,17 @@ class PunchService {
     
     const browser = await puppeteer.launch({
       executablePath: executablePath,
-      headless: this.showBrowser, // 根據環境變數決定是否顯示瀏覽器視窗
+      headless: !this.showBrowser, // 根據環境變數決定是否顯示瀏覽器視窗
       defaultViewport: null,
+      protocolTimeout: 120000,
+      // 注意: 不要加 --no-zygote、--disable-features=VizDisplayCompositor 等舊參數，
+      // 在新版 Chrome 上會導致 renderer 掛死、頁面載入逾時
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
         '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor'
+        '--no-first-run'
       ]
     });
     
@@ -192,11 +192,14 @@ class PunchService {
       console.log('正在登入系統...');
 
       // 前往登入頁面
-      await page.goto(this.loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      // 注意: 網站有持續的背景請求，networkidle2 永遠等不到閒置，只能等 DOM 載入後再等表單元素
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       console.log(`目前頁面 URL: ${page.url()}`);
 
-      // 等待頁面載入完成
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // 明確等待登入表單出現
+      console.log('等待登入表單載入...');
+      await page.waitForSelector('input[placeholder="公司代碼"], input[type="password"]', { timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // 記錄頁面資訊以便除錯
       const pageTitle = await page.title();
@@ -307,9 +310,24 @@ class PunchService {
       await loginButton.click();
 
       // 等待登入完成並跳轉到首頁
+      // 注意: 這是 SPA，不能用 waitForNavigation(networkidle2)，改為等待 URL 離開登入頁
       console.log('等待登入完成...');
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
-      
+      try {
+        await page.waitForFunction(
+          () => !window.location.href.includes('/login'),
+          { timeout: 60000 }
+        );
+      } catch (waitError) {
+        // 逾時後再確認一次目前 URL，避免誤判
+        if (page.url().includes('/login')) {
+          const pageMessage = await page.evaluate(() => {
+            const el = document.querySelector('.el-message, .alert, .error, [class*="error-message"]');
+            return el ? el.textContent.trim() : null;
+          });
+          throw new Error(`登入後未離開登入頁${pageMessage ? `，頁面訊息: ${pageMessage}` : '，可能是帳號密碼錯誤或頁面改版'}`);
+        }
+      }
+
       console.log('登入成功');
       return true;
     } catch (error) {
@@ -555,6 +573,10 @@ class PunchService {
       browser = await this.launchBrowser();
       const page = await browser.newPage();
 
+      // 移除 UA 中的 HeadlessChrome 標記，避免被網站判定為不支援的瀏覽器
+      const userAgent = await browser.userAgent();
+      await page.setUserAgent(userAgent.replace('HeadlessChrome', 'Chrome'));
+
       // 設置位置權限
       const permissionSet = await this.setupLocationPermission(browser);
       if (!permissionSet) {
@@ -568,7 +590,20 @@ class PunchService {
       }
 
       // 前往首頁
-      await page.goto(this.homeUrl, { waitUntil: 'networkidle2' });
+      // 注意: 網站有持續的背景請求，networkidle2 會逾時，改為等待打卡按鈕出現
+      await page.goto(this.homeUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      console.log('等待打卡按鈕載入...');
+      try {
+        await page.waitForFunction(() => {
+          const elements = Array.from(document.querySelectorAll('button, span, a, div[role="button"]'));
+          return elements.some(el => {
+            const text = el.textContent.trim();
+            return text.includes('上班') || text.includes('下班');
+          });
+        }, { timeout: 30000 });
+      } catch (waitError) {
+        console.log('⚠️ 等待打卡按鈕逾時，仍繼續嘗試...');
+      }
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // 設置地理位置
